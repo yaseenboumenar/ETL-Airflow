@@ -1,0 +1,64 @@
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.dist/
+.build/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# --- Virtual envs & dotenvs (keep secrets out of git) ---
+.venv/
+venv/
+.env
+.env.*
+
+# --- Airflow (runtime artifacts only) ---
+airflow/logs/
+airflow/dags/__pycache__/
+airflow/plugins/__pycache__/
+
+# --- Docker / local volumes that might appear ---
+**/pgdata/
+**/postgres-data/
+
+# --- Datasets (keep CSV demo, ignore generated stuff) ---
+datasets/**/*.parquet
+datasets/**/*.orc
+datasets/**/*.avro
+datasets/tmp/
+datasets/*.tmp
+
+# --- dbt (runtime + packages; keep project files) ---
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+dbt/profiles.yml          # commit profiles.example.yml instead
+
+# --- Terraform (ignore providers/state; keep lock file) ---
+terraform/.terraform/
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars
+*.auto.tfvars
+# keep the lock file – DO commit this:
+!terraform/.terraform.lock.hcl
+
+# --- Node/Yarn if any sneaks in ---
+node_modules/
