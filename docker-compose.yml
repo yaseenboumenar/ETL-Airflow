@@ -34,6 +34,7 @@ services:
     image: apache/airflow:2.9.2
     depends_on: [airflow-db]
     environment:
+      AIRFLOW__WEBSERVER__SECRET_KEY: "please-change-me-but-same-in-all-containers"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
       AIRFLOW_SECRET_KEY: "af79bd143b4797c19f91c29568a44526be74ff591e281f1c9dc5aa7d1828b4b9"
@@ -57,6 +58,7 @@ services:
     image: apache/airflow:2.9.2
     depends_on: [airflow-init]
     environment:
+      AIRFLOW__WEBSERVER__SECRET_KEY: "please-change-me-but-same-in-all-containers"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
       _PIP_ADDITIONAL_REQUIREMENTS: >-
@@ -74,6 +76,7 @@ services:
     image: apache/airflow:2.9.2
     depends_on: [airflow-webserver]
     environment:
+      AIRFLOW__WEBSERVER__SECRET_KEY: "please-change-me-but-same-in-all-containers"
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
       _PIP_ADDITIONAL_REQUIREMENTS: >-
