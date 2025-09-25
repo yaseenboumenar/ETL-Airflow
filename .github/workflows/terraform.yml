@@ -1,64 +1,52 @@
-name: IaC - Terraform
+
+name: Terraform
 
 on:
-    push:
-        branches: [ main ]
-    pull_request:
-        branches: [ main ]
-    
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main, pysparks-ETL ]
+  workflow_dispatch:                    # <--- lets you run it manually
+
 permissions:
-    id-token: write
-    contents: read
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-north-1
+  TF_WORKING_DIR: ./terraform
 
 jobs:
-    plan:
-        if: github.event_name == 'pull_request'
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
+  plan:
+    if: github.event_name != 'push' || (github.event_name == 'push' && github.ref != 'refs/heads/main')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::47111267120:role/gh-oidc-terraform
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: 1.8.5 }
+      - run: terraform init -input=false
+        working-directory: ${{ env.TF_WORKING_DIR }}
+      - run: terraform validate -no-color
+        working-directory: ${{ env.TF_WORKING_DIR }}
+      - run: terraform plan -input=false -out=tfplan
+        working-directory: ${{ env.TF_WORKING_DIR }}
 
-            - uses: hashicorp/setup-terraform@v3
-              with:
-                terraform_version: 1.8.5
-
-            - uses: aws-actions/configure-aws-credentials@v4
-              with:
-                role-to-assume: arn:aws:iam::471112627120:role/gh-oidc-terraform
-                aws-region: eu-north-1
-
-            - name: Terraform Init
-              working-directory: terraform
-              run: terraform init -input=false
-
-            - name: Terraform Plan
-              working-directory: terraform
-              run: terraform plan -input=false -out=tfplan
-            
-            - name: Upload plan artifact
-              uses: actions/upload-artifact@v4
-              with:
-                name: tfplan
-                path: ${{ env.TF_WORKING_DIR }}/tfplan
-
-    apply:
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-
-            - uses: hashicorp/setup-terraform@v3
-              with:
-                terraform_version: 1.8.5
-
-            - uses: aws-actions/configure-aws-credentials@v4
-              with:
-                role-to-assume: arn:aws:iam::471112627120:role/gh-oidc-terraform
-                aws-region: eu-north-1
-
-            - name: Terraform Init
-              working-directory: terraform
-              run: terraform init -input=false
-
-            - name: Terraform Apply
-              working-directory: terraform
-              run: terraform apply -input=false -auto-approve
+  apply:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::47111267120:role/gh-oidc-terraform
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: 1.8.5 }
+      - run: terraform init -input=false
+        working-directory: ${{ env.TF_WORKING_DIR }}
+      - run: terraform apply -auto-approve
+        working-directory: ${{ env.TF_WORKING_DIR }}
