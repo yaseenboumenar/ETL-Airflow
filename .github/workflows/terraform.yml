@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::47111267120:role/gh-oidc-terraform
+          role-to-assume: arn:aws:iam::471112627120:role/gh-oidc-terraform
           aws-region: ${{ env.AWS_REGION }}
       - uses: hashicorp/setup-terraform@v3
         with: { terraform_version: 1.8.5 }
@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::47111267120:role/gh-oidc-terraform
+          role-to-assume: arn:aws:iam::471112627120:role/gh-oidc-terraform
           aws-region: ${{ env.AWS_REGION }}
       - uses: hashicorp/setup-terraform@v3
         with: { terraform_version: 1.8.5 }
