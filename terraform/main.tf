@@ -8,7 +8,7 @@ locals {
 # ---------- Ingestion (read) bucket ----------
 resource "aws_s3_bucket" "read" {
   bucket        = var.read_bucket_name
-  force_destroy = true        # dev convenience; remove in prod
+  force_destroy = true
   tags          = local.tags
 }
 
@@ -69,39 +69,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "write" {
   }
 }
 
-# Optional: deny non-SSL
-data "aws_iam_policy_document" "ssl_only" {
-  statement {
-    sid     = "DenyInsecureTransport"
-    effect  = "Deny"
-    actions = ["s3:*"]
-    principals {
-        type = "*"
-        identifiers = ["*"] 
-      }
-    resources = [
-      aws_s3_bucket.read.arn,  "${aws_s3_bucket.read.arn}/*",
-      aws_s3_bucket.write.arn, "${aws_s3_bucket.write.arn}/*",
-    ]
-    condition {
-      test     = "Bool"
-      variable = "aws:SecureTransport"
-      values   = ["false"]
-    }
-  }
-}
-
-resource "aws_s3_bucket_policy" "ssl_read" {
-  bucket = aws_s3_bucket.read.id
-  policy = data.aws_iam_policy_document.ssl_only.json
-}
-
-resource "aws_s3_bucket_policy" "ssl_write" {
-  bucket = aws_s3_bucket.write.id
-  policy = data.aws_iam_policy_document.ssl_only.json
-}
-
-# Optional: seed demo CSV to ingestion bucket at raw/nhs_data.csv
+# ---------- Seed a demo CSV into ingestion bucket ----------
 resource "aws_s3_object" "seed_csv" {
   bucket = aws_s3_bucket.read.id
   key    = "raw/nhs_data.csv"
@@ -109,7 +77,7 @@ resource "aws_s3_object" "seed_csv" {
   etag   = filemd5(var.seed_csv_path)
 }
 
-# Generate an env file used by Docker Compose
+# ---------- Generate env file for Docker Compose ----------
 resource "local_file" "airflow_env" {
   filename = "${path.module}/../.env.airflow"
   content  = <<EOF
