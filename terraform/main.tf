@@ -1,66 +1,85 @@
-terraform {
-  required_version = ">= 1.7.0"
-  required_providers {
-    aws = { source = "hashicorp/aws", version = "~> 5.0" }
-  }
-}
-
-provider "aws" {
-  region = var.aws_region
-}
-
-# --- S3 data lake (private, versioned, encrypted) ---
-resource "aws_s3_bucket" "data_lake" {
-  bucket        = var.bucket_name
-  force_destroy = false
+locals {
   tags = {
-    project = "nhs-etl"
-    env     = var.env
+    Project = var.project_prefix
+    Env     = "dev"
   }
 }
 
-resource "aws_s3_bucket_versioning" "v" {
-  bucket = aws_s3_bucket.data_lake.id
-  versioning_configuration {
-    status = "Enabled"
-  }
+# ---------- Ingestion (read) bucket ----------
+resource "aws_s3_bucket" "read" {
+  bucket        = var.read_bucket_name
+  force_destroy = true        # dev convenience; remove in prod
+  tags          = local.tags
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "sse" {
-  bucket = aws_s3_bucket.data_lake.id
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
+resource "aws_s3_bucket_ownership_controls" "read" {
+  bucket = aws_s3_bucket.read.id
+  rule { object_ownership = "BucketOwnerEnforced" }
 }
 
-resource "aws_s3_bucket_public_access_block" "pab" {
-  bucket                  = aws_s3_bucket.data_lake.id
+resource "aws_s3_bucket_public_access_block" "read" {
+  bucket                  = aws_s3_bucket.read.id
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
 
-# Deny non-TLS access (defense-in-depth)
-data "aws_iam_policy_document" "tls_only" {
+resource "aws_s3_bucket_versioning" "read" {
+  bucket = aws_s3_bucket.read.id
+  versioning_configuration { status = "Enabled" }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "read" {
+  bucket = aws_s3_bucket.read.id
+  rule {
+    apply_server_side_encryption_by_default { sse_algorithm = "AES256" }
+  }
+}
+
+# ---------- Silver (write) bucket ----------
+resource "aws_s3_bucket" "write" {
+  bucket        = var.write_bucket_name
+  force_destroy = true
+  tags          = local.tags
+}
+
+resource "aws_s3_bucket_ownership_controls" "write" {
+  bucket = aws_s3_bucket.write.id
+  rule { object_ownership = "BucketOwnerEnforced" }
+}
+
+resource "aws_s3_bucket_public_access_block" "write" {
+  bucket                  = aws_s3_bucket.write.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_versioning" "write" {
+  bucket = aws_s3_bucket.write.id
+  versioning_configuration { status = "Enabled" }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "write" {
+  bucket = aws_s3_bucket.write.id
+  rule {
+    apply_server_side_encryption_by_default { sse_algorithm = "AES256" }
+  }
+}
+
+# Optional: deny non-SSL
+data "aws_iam_policy_document" "ssl_only" {
   statement {
-    sid    = "DenyInsecureTransport"
-    effect = "Deny"
-
-    principals {
-      type        = "*"
-      identifiers = ["*"]
-    }
-
+    sid     = "DenyInsecureTransport"
+    effect  = "Deny"
     actions = ["s3:*"]
-
+    principals { type = "*", identifiers = ["*"] }
     resources = [
-      aws_s3_bucket.data_lake.arn,
-      "${aws_s3_bucket.data_lake.arn}/*"
+      aws_s3_bucket.read.arn,  "${aws_s3_bucket.read.arn}/*",
+      aws_s3_bucket.write.arn, "${aws_s3_bucket.write.arn}/*",
     ]
-
     condition {
       test     = "Bool"
       variable = "aws:SecureTransport"
@@ -69,49 +88,30 @@ data "aws_iam_policy_document" "tls_only" {
   }
 }
 
-resource "aws_s3_bucket_policy" "tls_policy" {
-  bucket = aws_s3_bucket.data_lake.id
-  policy = data.aws_iam_policy_document.tls_only.json
+resource "aws_s3_bucket_policy" "ssl_read" {
+  bucket = aws_s3_bucket.read.id
+  policy = data.aws_iam_policy_document.ssl_only.json
 }
 
-# --- Least-privilege policy for ETL (read/write bronze & silver) ---
-data "aws_iam_policy_document" "etl_access" {
-  statement {
-    effect    = "Allow"
-    actions   = ["s3:ListBucket"]
-    resources = [aws_s3_bucket.data_lake.arn]
-
-    condition {
-      test     = "StringLike"
-      variable = "s3:prefix"
-      values   = ["bronze/*", "silver/*"]
-    }
-  }
-
-  statement {
-    effect  = "Allow"
-    actions = ["s3:GetObject", "s3:PutObject"]
-    resources = [
-      "${aws_s3_bucket.data_lake.arn}/bronze/*",
-      "${aws_s3_bucket.data_lake.arn}/silver/*"
-    ]
-  }
+resource "aws_s3_bucket_policy" "ssl_write" {
+  bucket = aws_s3_bucket.write.id
+  policy = data.aws_iam_policy_document.ssl_only.json
 }
 
-resource "aws_iam_policy" "etl_policy" {
-  name   = "${var.bucket_name}-etl-s3"
-  policy = data.aws_iam_policy_document.etl_access.json
+# Optional: seed demo CSV to ingestion bucket at raw/nhs_data.csv
+resource "aws_s3_object" "seed_csv" {
+  bucket = aws_s3_bucket.read.id
+  key    = "raw/nhs_data.csv"
+  source = var.seed_csv_path
+  etag   = filemd5(var.seed_csv_path)
 }
 
-# Optional: attach the policy to an existing IAM user or role
-resource "aws_iam_user_policy_attachment" "attach_user" {
-  count      = var.attach_to_user_name != "" ? 1 : 0
-  user       = var.attach_to_user_name
-  policy_arn = aws_iam_policy.etl_policy.arn
-}
-
-resource "aws_iam_role_policy_attachment" "attach_role" {
-  count      = var.attach_to_role_name != "" ? 1 : 0
-  role       = var.attach_to_role_name
-  policy_arn = aws_iam_policy.etl_policy.arn
+# Generate an env file used by Docker Compose
+resource "local_file" "airflow_env" {
+  filename = "${path.module}/../.env.airflow"
+  content  = <<EOF
+READ_BUCKET_NAME=${aws_s3_bucket.read.bucket}
+WRITE_BUCKET_NAME=${aws_s3_bucket.write.bucket}
+AWS_DEFAULT_REGION=${var.region}
+EOF
 }
