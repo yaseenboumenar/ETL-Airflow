@@ -6,7 +6,7 @@ on:
     branches: [ main ]
   push:
     branches: [ main, pysparks-ETL ]
-  workflow_dispatch:                    # <--- lets you run it manually
+  workflow_dispatch:                        # <--- lets you run it manually
 
 permissions:
   id-token: write
