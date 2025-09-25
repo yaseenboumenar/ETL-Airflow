@@ -5,10 +5,10 @@ on:
     branches: [ main ]
   push:
     branches: [ main, pysparks-ETL ]
-  workflow_dispatch:            # allow manual runs
+  workflow_dispatch:                    # allow manual runs
 
 permissions:
-  id-token: write               # required for OIDC -> AWS
+  id-token: write                        # required for OIDC -> AWS
   contents: read
 
 env:
